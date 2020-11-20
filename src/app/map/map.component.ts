@@ -18,9 +18,20 @@ export class MapComponent implements OnInit, AfterViewInit {
   private map;
   private bubbles;
   fill: any;
+  legend: any;
+  maxRadius: any;
+  opacity: any;
+  max: number;
+  normal: any;
+  minArea: number;
+  maxArea: number;
+  scale: any;
   constructor(
     private http: HttpClient
     ) {}
+  ngOnInit() {
+    this.initMap();
+  }
   ngAfterViewInit(): void {
     this.http.get('assets/json/geoJson.json').subscribe((res) => {
       this.geoJson = res;
@@ -28,10 +39,6 @@ export class MapComponent implements OnInit, AfterViewInit {
       this.addLegend();
     });
    }
-
-  ngOnInit() {
-    this.initMap();
-  }
   initMap(){
     this.map = L.map('map', {
       center: [ 39.8282, -98.5795 ],
@@ -47,10 +54,17 @@ addBubbles(){
  this.bubbles = L.bubbleLayer(this.geoJson,
   {property: 'population',
   legend: false,
-  max_radius : 40,
+  maxRadius : 40,
   scale: 'YlGnBu',
   tooltip : true
   });
+ this.legend = new L.Control({ position: 'bottomright' });
+ this.maxRadius = this.bubbles.options.maxRadius;
+ this.opacity = this.bubbles.options.style.opacity;
+ this.max = this.getMax();
+ this.normal = d3_scale.scaleLinear()
+ .domain([0, this.max])
+ .range([0, 1]);
  this.bubbles.addTo(this.map);
  }
  getMax() {
@@ -65,43 +79,39 @@ addBubbles(){
 
   return max;
 }
+getScale(){
+  this.minArea = Math.PI * 3 * 3;
+  this.maxArea = Math.PI * this.bubbles.options.maxRadius * this.bubbles.options.maxRadius;
+  this.scale = d3_scale.scaleLinear()
+.domain([0, this.max])
+.range([this.minArea, this.maxArea]);
+}
 addLegend(){
-const legend = new L.Control({ position: 'bottomright' });
-const max_radius = this.bubbles.options.max_radius;
-const opacity = this.bubbles.options.style.opacity;
-const max = this.getMax();
-const normal = d3_scale.scaleLinear()
- .domain([0, max])
- .range([0, 1]);
-legend.onAdd = () => {
+this.legend.onAdd = () => {
  const div = L.DomUtil.create('div', 'info legend');
  div.innerHTML += '<strong>' + this.bubbles.options.property + '</strong><br/>';
  div.style = 'background-color: #FFF; padding: 8px; font-size: 14px; text-transform: capitalize'
  for (let i = 3; i > 0; i--) {
-      const minArea = Math.PI * 3 * 3;
-      const maxArea = Math.PI * this.bubbles.options.max_radius * this.bubbles.options.max_radius;
-      const scale = d3_scale.scaleLinear()
-  .domain([0, max])
-  .range([minArea, maxArea]);
-      const area = scale(max / i / 2);
+      this.getScale();
+      const area = this.scale(this.max / i / 2);
       const radius = Math.sqrt(area / Math.PI)
       const item = L.DomUtil.create('div', 'bubble');
       if (this.bubbles.options.scale) {
     const fillScale = chroma.scale(this.bubbles.options.scale);
     if (fillScale) {
-    this.fill = fillScale(normal(max / i));
+    this.fill = fillScale(this.normal(this.max / i));
     }
   }
-      item.innerHTML = '<svg height="' + (max_radius * 2) + '" width="' + (max_radius * 2 - (max_radius / 2)) + '">' +
-      '<circle cx="' + (radius + 1) + '" cy="' + max_radius + '" r="' + radius + '" stroke="' + chroma(this.fill).darken().hex() + '" stroke-width="1" opacity="' + opacity + '" fill="' + this.fill + '" />' +
-      '<text font-size="11" text-anchor="middle" x="' + (radius) + '" y="' + (max_radius * 2) + '" fill="#AAA">' + numeral(max / i).format('0 a'); + '</text>' +
+      item.innerHTML = '<svg height="' + (this.maxRadius * 2) + '" width="' + (this.maxRadius * 2 - (this.maxRadius / 2)) + '">' +
+      '<circle cx="' + (radius + 1) + '" cy="' + this.maxRadius + '" r="' + radius + '" stroke="' + chroma(this.fill).darken().hex() + '" stroke-width="1" opacity="' + this.opacity + '" fill="' + this.fill + '" />' +
+      '<text font-size="11" text-anchor="middle" x="' + (radius) + '" y="' + (this.maxRadius * 2) + '" fill="#AAA">' + numeral(this.max / i).format('0 a'); + '</text>' +
       '</svg>';
       item.style = 'float:left; width: ' + radius + ';';
       div.appendChild(item);
 }
  return div;
  };
-legend.addTo(this.map);
+this.legend.addTo(this.map);
 
 }
 }
